@@ -1,8 +1,15 @@
+import java.awt.AWTException;
 import java.awt.BorderLayout;
 import java.awt.EventQueue;
+import java.awt.Image;
+import java.awt.SystemTray;
+import java.awt.Toolkit;
+import java.awt.TrayIcon;
+import java.awt.TrayIcon.MessageType;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,6 +34,7 @@ public class JanelaJava extends JFrame {
 	private boolean monitorar = false;
 	private JTextField textField_Preco;
 	private JTextPane textPane;
+	private Item itemMonitorado;
 
 	public static void main(String[] args) {
 		EventQueue.invokeLater(new Runnable() {
@@ -66,6 +74,7 @@ public class JanelaJava extends JFrame {
 		contentPane.add(btnMonitorar);
 		
 		textField_Preco = new JTextField();
+		textField_Preco.setText("0");
 		textField_Preco.setBounds(222, 39, 150, 20);
 		contentPane.add(textField_Preco);
 		textField_Preco.setColumns(10);
@@ -81,23 +90,68 @@ public class JanelaJava extends JFrame {
 				if(monitorar == false)
 				{
 					monitorar = true;
-					new webCrawlerTask().run();
+					itemMonitorado = criaItem();
+					Thread custListLoadThread = new Thread(new webCrawlerTask());
+					custListLoadThread.start();
+					//new webCrawlerTask().run();
+					btnMonitorar.setText("Parar");
 				}
 				else
 				{
 					monitorar = false;
+					btnMonitorar.setText("Monitorar");
 				}
 			}
 		});
 	}
 	
+	private Item criaItem()
+	{
+		Item item = new Item();
+		item.setNome(textField.getText());
+		item.setPrecoMenor(Integer.parseInt(textField_Preco.getText()));
+		return item;
+	}
+	
+	private String createUrl()
+	{
+		String url= "https://www.ragcomercio.com/search/2/";
+		String nomeItem = textField.getText().replaceAll("\\ ", "+").toLowerCase();
+		url = url + nomeItem;
+		return url;
+	}
+	
+	//Trecho de Codigo que nao e meu em partes 
+	//-----------------------------------
+	public void displayTray() throws AWTException, MalformedURLException {
+        //Obtain only one instance of the SystemTray object
+        SystemTray tray = SystemTray.getSystemTray();
+
+        //If the icon is a file
+        Image image = Toolkit.getDefaultToolkit().createImage("icon.png");
+        //Alternative (if the icon is on the classpath):
+        //Image image = Toolkit.getDefaultToolkit().createImage(getClass().getResource("icon.png"));
+
+        TrayIcon trayIcon = new TrayIcon(image, "Item Encontrado");
+        //Let the system resize the image if needed
+        trayIcon.setImageAutoSize(true);
+        //Set tooltip text for the tray icon
+        trayIcon.setToolTip("Item");
+        tray.add(trayIcon);
+
+        trayIcon.displayMessage("Um item foi encontrado", "Acesse o o site RagComercio", MessageType.INFO);
+    }
+	//-------------------------------------
+	//Fim
+	
 	private class webCrawlerTask implements Runnable
 	{
 		public void run() {
-			//while(monitorar == true)
+			while(monitorar == true)
 			{
-				String url = "https://www.ragcomercio.com/search/2/manual+de+combate";
+				String url = createUrl();
 				try {
+					textPane.setText("Buscando...");
 					Document document =  Jsoup.connect(url).get(); //conecta na url
 					Elements elements = document.select("div#results"); //acha a divisao de resultados
 					Element element = elements.select("table").first(); //acha a primeira tabela
@@ -111,17 +165,34 @@ public class JanelaJava extends JFrame {
 						novoItem.setNome(nome);
 						novoItem.setPrecoMenor(precoMenor);
 						itemsObj.add(novoItem);
+						if(itemMonitorado.getNome().equals(novoItem.getNome()))
+						{
+							if(itemMonitorado.getPrecoMenor() >= novoItem.getPrecoMenor())
+							{
+								try {
+									displayTray();
+								} catch (AWTException e) {
+									e.printStackTrace();
+								}
+							}
+						}
 					}
-
 					String texto = "";
-					for(int i=0;i<itemsObj.size();i++)
+					for(int i=0; i<itemsObj.size();i++)
 					{
 						texto = texto +"Nome: " + itemsObj.get(i).getNome() + " | Preço: " + itemsObj.get(i).getPrecoMenor() + "\n";
 					}
-					
 					textPane.setText(texto);
+					
 				} catch (IOException e) {
 					e.printStackTrace();
+				}
+				
+				try {
+					Thread.sleep(300000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+					monitorar = false;
 				}
 			}
 		}
