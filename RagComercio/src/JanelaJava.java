@@ -84,10 +84,10 @@ public class JanelaJava extends JFrame {
 		btnBuscar.setBounds(144, 67, 89, 23);
 		contentPane.add(btnBuscar);
 		
-		btnBuscar.addActionListener(new ActionListener() {
+		btnBuscar.addActionListener(new ActionListener() { //Botao de Busca
 			
 			public void actionPerformed(ActionEvent e) {
-				Thread custListLoadThread = new Thread(new buscaTask());
+				Thread custListLoadThread = new Thread(new buscaTask()); //dispara a terefa de busca
 				custListLoadThread.start();
 			}
 		});
@@ -95,7 +95,7 @@ public class JanelaJava extends JFrame {
 		JButton btnEsconder = new JButton("Esconder");
 		btnEsconder.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				frame.setVisible(false);
+				frame.setVisible(false); //esconde a janela
 			}
 		});
 		btnEsconder.setBounds(10, 264, 89, 23);
@@ -105,19 +105,19 @@ public class JanelaJava extends JFrame {
 		lblItemsMonitorados.setBounds(517, 39, 177, 14);
 		contentPane.add(lblItemsMonitorados);
 		
-		DefaultListModel<String> model = new DefaultListModel<>();
-		list = new JList<String>(model);
+		DefaultListModel<String> model = new DefaultListModel<>(); //cria o modela da lista como strings
+		list = new JList<String>(model); //gera a lista com o modelo
 		list.setBounds(517, 70, 255, 171);
 		contentPane.add(list);
 		
 		btnRemover = new JButton("Remover");
 		btnRemover.setBounds(396, 151, 89, 23);
 		
-		btnRemover.addActionListener(new ActionListener() {
+		btnRemover.addActionListener(new ActionListener() { //botao para remover da busca
 			public void actionPerformed(ActionEvent e) {
 				
 				String itemRemover = list.getSelectedValue();
-				((DefaultListModel<String>) list.getModel()).removeElement(itemRemover);
+				((DefaultListModel<String>) list.getModel()).removeElement(itemRemover); //remove o elemento da lista
 				int index = getListIndexByName(itemRemover);
 				listaMonitorados.remove(index);
 			}
@@ -127,7 +127,7 @@ public class JanelaJava extends JFrame {
 		JButton btnMonitorar = new JButton("Monitorar");
 		btnMonitorar.setBounds(396, 117, 89, 23);
 		contentPane.add(btnMonitorar);
-		btnMonitorar.addActionListener(new ActionListener() {
+		btnMonitorar.addActionListener(new ActionListener() { //botao para adicionar ao monitoramento
 
 			public void actionPerformed(ActionEvent e) {
 				Item itemMonitorado = new Item();
@@ -136,15 +136,15 @@ public class JanelaJava extends JFrame {
 				itemMonitorado.setPrecoMenor(Integer.parseInt(preco));
 				listaMonitorados.add(itemMonitorado);
 				((DefaultListModel<String>) list.getModel()).addElement(itemMonitorado.getNome());
-				if(listaMonitorados.size() == 1)
+				if(listaMonitorados.size() == 1) //se a lista estiver vazia inicialmente dispara a tarefa
 				{
-					Thread monitoraThread = new Thread(new monitorTask());
+					Thread monitoraThread = new Thread(new monitorTask()); 
 					monitoraThread.start();
 				}
 			}
 		});
 		
-		DefaultListModel<String> modelBusca = new DefaultListModel<>();
+		DefaultListModel<String> modelBusca = new DefaultListModel<>(); 
 		listBusca = new JList<String>(modelBusca);
 		listBusca.setBounds(37, 103, 332, 138);
 		contentPane.add(listBusca);
@@ -152,7 +152,7 @@ public class JanelaJava extends JFrame {
 		createSystemTray();
 	}
 	
-	private int getListIndexByName(String nome)
+	private int getListIndexByName(String nome) // acha o index de um item pelo nome
 	{
 		for(int i=0; i < listaMonitorados.size(); i++)
 		{
@@ -165,23 +165,23 @@ public class JanelaJava extends JFrame {
 		return -1;
 	}
 	
-	private Item criaItem()
+	private Item criaItem() //cria o objeto do item
 	{
 		Item item = new Item();
 		item.setNome(textField.getText());
 		return item;
 	}
 	
-	private String createUrl(String nome)
+	private String createUrl(String nome) //cria a url modelo
 	{
 		String url= "https://www.ragcomercio.com/search/2/";
-		String nomeItem = nome.replaceAll("\\ ", "+").toLowerCase();
-		nomeItem = unAccent(nomeItem);
+		String nomeItem = nome.replaceAll("\\ ", "+").toLowerCase(); //remove os espacos
+		nomeItem = unAccent(nomeItem); //remove os acentos
 		url = url + nomeItem;
 		return url;
 	}
 	
-	private boolean hasNewItem()
+	private boolean hasNewItem() //identifica se um novo item foi adicionado a lista
 	{
 		if(lastSize < listaMonitorados.size())
 		{
@@ -195,7 +195,7 @@ public class JanelaJava extends JFrame {
 		}
 	}
 	
-	private List<Item> accesUrl(Item itemAtual)
+	private List<Item> accesUrl(Item itemAtual) // faz o webCrawler com o nome do item 
 	{
 		String url = createUrl(itemAtual.getNome());
 		List<Item> itemsObj = new ArrayList<Item>();
