@@ -10,8 +10,13 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.JOptionPane;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -24,6 +29,7 @@ import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 
 public class JanelaJava extends JFrame {
@@ -35,12 +41,14 @@ public class JanelaJava extends JFrame {
 	private JTextField textField_Preco;
 	private JTextPane textPane;
 	private Item itemMonitorado;
+	private TrayIcon trayIcon;
+	private static JanelaJava frame;
 
 	public static void main(String[] args) {
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
-					JanelaJava frame = new JanelaJava();
+					frame = new JanelaJava();
 					frame.setVisible(true);
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -54,7 +62,7 @@ public class JanelaJava extends JFrame {
 	 */
 	public JanelaJava() {
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		setBounds(100, 100, 450, 300);
+		setBounds(100, 100, 449, 328);
 		contentPane = new JPanel();
 		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
 		setContentPane(contentPane);
@@ -70,18 +78,27 @@ public class JanelaJava extends JFrame {
 		textField.setColumns(10);
 		
 		btnMonitorar = new JButton("Monitorar");
-		btnMonitorar.setBounds(248, 76, 89, 23);
+		btnMonitorar.setBounds(234, 65, 89, 23);
 		contentPane.add(btnMonitorar);
 		
 		textField_Preco = new JTextField();
 		textField_Preco.setText("0");
-		textField_Preco.setBounds(222, 39, 150, 20);
+		textField_Preco.setBounds(198, 34, 206, 20);
 		contentPane.add(textField_Preco);
 		textField_Preco.setColumns(10);
 		
 		textPane = new JTextPane();
-		textPane.setBounds(21, 119, 383, 131);
+		textPane.setBounds(31, 99, 373, 131);
 		contentPane.add(textPane);
+		
+		JButton btnEsconder = new JButton("Esconder");
+		btnEsconder.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				frame.setVisible(false);
+			}
+		});
+		btnEsconder.setBounds(315, 255, 89, 23);
+		contentPane.add(btnEsconder);
 		
 		btnMonitorar.addActionListener(new ActionListener() {
 			
@@ -89,12 +106,15 @@ public class JanelaJava extends JFrame {
 				
 				if(monitorar == false)
 				{
-					monitorar = true;
 					itemMonitorado = criaItem();
+					if(itemMonitorado == null) {
+						JOptionPane.showMessageDialog(null, "Insira um valor");
+						return;
+					}
 					Thread custListLoadThread = new Thread(new webCrawlerTask());
 					custListLoadThread.start();
-					//new webCrawlerTask().run();
 					btnMonitorar.setText("Parar");
+					monitorar = true;
 				}
 				else
 				{
@@ -103,13 +123,18 @@ public class JanelaJava extends JFrame {
 				}
 			}
 		});
+		
+		createSystemTray();
 	}
 	
 	private Item criaItem()
 	{
 		Item item = new Item();
 		item.setNome(textField.getText());
-		item.setPrecoMenor(Integer.parseInt(textField_Preco.getText()));
+		String preco = textField_Preco.getText();
+		if(preco.equals(""))
+			return null;
+		item.setPrecoMenor(Integer.parseInt(preco));
 		return item;
 	}
 	
@@ -117,27 +142,83 @@ public class JanelaJava extends JFrame {
 	{
 		String url= "https://www.ragcomercio.com/search/2/";
 		String nomeItem = textField.getText().replaceAll("\\ ", "+").toLowerCase();
+		nomeItem = unAccent(nomeItem);
 		url = url + nomeItem;
 		return url;
 	}
 	
 	//Trecho de Codigo que nao e meu em partes 
 	//-----------------------------------
-	public void displayTray() throws AWTException, MalformedURLException {
+	
+	public static String unAccent(String s) {
+	    //
+	    // JDK1.5
+	    //   use sun.text.Normalizer.normalize(s, Normalizer.DECOMP, 0);
+	    //
+	    String temp = Normalizer.normalize(s, Normalizer.Form.NFD);
+	    Pattern pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
+	    return pattern.matcher(temp).replaceAll("");
+	  }
+	
+	private void createSystemTray()
+	{
+
+		 if (!SystemTray.isSupported()) {
+	         System.out.println("SystemTray is not supported");
+	         return;
+	     }
+	     PopupMenu popup = new PopupMenu();
+	     //Image image = Toolkit.getDefaultToolkit().getImage("icon.png");
+	     Image image = new ImageIcon(this.getClass().getResource("icon.png")).getImage();
+	     trayIcon = new TrayIcon(image, "Monitor de Itens");
+	     SystemTray tray = SystemTray.getSystemTray();
+	    
+	     // Create a pop-up menu components
+	     MenuItem aboutItem = new MenuItem("Abrir");
+	     MenuItem exitItem = new MenuItem("Sair");
+	    
+	     aboutItem.addActionListener(new ActionListener() {
+			
+			public void actionPerformed(ActionEvent e) {
+				
+				frame.setVisible(true);
+			}
+		 });
+	     exitItem.addActionListener(new ActionListener() {
+
+			public void actionPerformed(ActionEvent e) {
+				 System.exit(0);
+			}
+		 });
+	     //Add components to pop-up menu
+	     popup.add(aboutItem);
+	     popup.addSeparator();
+	     popup.add(exitItem);
+	    
+	     trayIcon.setPopupMenu(popup);
+	    
+	     try {
+	         tray.add(trayIcon);
+	     } catch (AWTException e) {
+	         System.out.println("TrayIcon could not be added.");
+	     }
+	}
+	
+	private void displayTray() {
         //Obtain only one instance of the SystemTray object
-        SystemTray tray = SystemTray.getSystemTray();
+        //SystemTray tray = SystemTray.getSystemTray();
 
         //If the icon is a file
-        Image image = Toolkit.getDefaultToolkit().createImage("icon.png");
+        //Image image = Toolkit.getDefaultToolkit().createImage("icon.png");
         //Alternative (if the icon is on the classpath):
         //Image image = Toolkit.getDefaultToolkit().createImage(getClass().getResource("icon.png"));
 
-        TrayIcon trayIcon = new TrayIcon(image, "Item Encontrado");
+        //TrayIcon trayIcon = new TrayIcon(image, "Item Encontrado");
         //Let the system resize the image if needed
-        trayIcon.setImageAutoSize(true);
+        //trayIcon.setImageAutoSize(true);
         //Set tooltip text for the tray icon
-        trayIcon.setToolTip("Item");
-        tray.add(trayIcon);
+        //trayIcon.setToolTip("Item");
+        //tray.add(trayIcon);
 
         trayIcon.displayMessage("Um item foi encontrado", "Acesse o o site RagComercio", MessageType.INFO);
     }
@@ -169,11 +250,7 @@ public class JanelaJava extends JFrame {
 						{
 							if(itemMonitorado.getPrecoMenor() >= novoItem.getPrecoMenor())
 							{
-								try {
-									displayTray();
-								} catch (AWTException e) {
-									e.printStackTrace();
-								}
+								displayTray();
 							}
 						}
 					}
