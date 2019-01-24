@@ -29,20 +29,23 @@ import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
+import javax.swing.JList;
 
 public class JanelaJava extends JFrame {
 
 	private JPanel contentPane;
 	private JTextField textField;
-	private JButton btnMonitorar;
-	private boolean monitorar = false;
-	private JTextField textField_Preco;
-	private JTextPane textPane;
-	private Item itemMonitorado;
+	private JButton btnBuscar;
 	private TrayIcon trayIcon;
 	private static JanelaJava frame;
+	private JList<String> list;
+	JList<String> listBusca;
+	private JButton btnRemover;
+	private List<Item> listaMonitorados = new ArrayList<Item>();
+	int lastSize = 0;
 
 	public static void main(String[] args) {
 		EventQueue.invokeLater(new Runnable() {
@@ -62,34 +65,32 @@ public class JanelaJava extends JFrame {
 	 */
 	public JanelaJava() {
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		setBounds(100, 100, 449, 328);
+		setBounds(100, 100, 818, 328);
 		contentPane = new JPanel();
 		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
 		setContentPane(contentPane);
 		contentPane.setLayout(null);
 		
 		JLabel lblDigiteOItem = new JLabel("Digite o item a ser monitorado:");
-		lblDigiteOItem.setBounds(10, 11, 170, 14);
+		lblDigiteOItem.setBounds(90, 11, 240, 14);
 		contentPane.add(lblDigiteOItem);
 		
 		textField = new JTextField();
-		textField.setBounds(198, 8, 206, 20);
+		textField.setBounds(90, 36, 206, 20);
 		contentPane.add(textField);
 		textField.setColumns(10);
 		
-		btnMonitorar = new JButton("Monitorar");
-		btnMonitorar.setBounds(234, 65, 89, 23);
-		contentPane.add(btnMonitorar);
+		btnBuscar = new JButton("Buscar");
+		btnBuscar.setBounds(144, 67, 89, 23);
+		contentPane.add(btnBuscar);
 		
-		textField_Preco = new JTextField();
-		textField_Preco.setText("0");
-		textField_Preco.setBounds(198, 34, 206, 20);
-		contentPane.add(textField_Preco);
-		textField_Preco.setColumns(10);
-		
-		textPane = new JTextPane();
-		textPane.setBounds(31, 99, 373, 131);
-		contentPane.add(textPane);
+		btnBuscar.addActionListener(new ActionListener() {
+			
+			public void actionPerformed(ActionEvent e) {
+				Thread custListLoadThread = new Thread(new buscaTask());
+				custListLoadThread.start();
+			}
+		});
 		
 		JButton btnEsconder = new JButton("Esconder");
 		btnEsconder.addActionListener(new ActionListener() {
@@ -97,54 +98,126 @@ public class JanelaJava extends JFrame {
 				frame.setVisible(false);
 			}
 		});
-		btnEsconder.setBounds(315, 255, 89, 23);
+		btnEsconder.setBounds(10, 264, 89, 23);
 		contentPane.add(btnEsconder);
 		
-		btnMonitorar.addActionListener(new ActionListener() {
-			
+		JLabel lblItemsMonitorados = new JLabel("Items Monitorados:");
+		lblItemsMonitorados.setBounds(517, 39, 177, 14);
+		contentPane.add(lblItemsMonitorados);
+		
+		DefaultListModel<String> model = new DefaultListModel<>();
+		list = new JList<String>(model);
+		list.setBounds(517, 70, 255, 171);
+		contentPane.add(list);
+		
+		btnRemover = new JButton("Remover");
+		btnRemover.setBounds(396, 151, 89, 23);
+		
+		btnRemover.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				
-				if(monitorar == false)
+				String itemRemover = list.getSelectedValue();
+				((DefaultListModel<String>) list.getModel()).removeElement(itemRemover);
+				int index = getListIndexByName(itemRemover);
+				listaMonitorados.remove(index);
+			}
+		});
+		contentPane.add(btnRemover);
+		
+		JButton btnMonitorar = new JButton("Monitorar");
+		btnMonitorar.setBounds(396, 117, 89, 23);
+		contentPane.add(btnMonitorar);
+		btnMonitorar.addActionListener(new ActionListener() {
+
+			public void actionPerformed(ActionEvent e) {
+				Item itemMonitorado = new Item();
+				itemMonitorado.setNome(listBusca.getSelectedValue());
+				String preco = JOptionPane.showInputDialog(null, "Insira o limite inferior:");
+				itemMonitorado.setPrecoMenor(Integer.parseInt(preco));
+				listaMonitorados.add(itemMonitorado);
+				((DefaultListModel<String>) list.getModel()).addElement(itemMonitorado.getNome());
+				if(listaMonitorados.size() == 1)
 				{
-					itemMonitorado = criaItem();
-					if(itemMonitorado == null) {
-						JOptionPane.showMessageDialog(null, "Insira um valor");
-						return;
-					}
-					Thread custListLoadThread = new Thread(new webCrawlerTask());
-					custListLoadThread.start();
-					btnMonitorar.setText("Parar");
-					monitorar = true;
-				}
-				else
-				{
-					monitorar = false;
-					btnMonitorar.setText("Monitorar");
+					Thread monitoraThread = new Thread(new monitorTask());
+					monitoraThread.start();
 				}
 			}
 		});
 		
+		DefaultListModel<String> modelBusca = new DefaultListModel<>();
+		listBusca = new JList<String>(modelBusca);
+		listBusca.setBounds(37, 103, 332, 138);
+		contentPane.add(listBusca);
+		
 		createSystemTray();
+	}
+	
+	private int getListIndexByName(String nome)
+	{
+		for(int i=0; i < listaMonitorados.size(); i++)
+		{
+			if(listaMonitorados.get(i).getNome().equals(nome))
+			{
+				return i;
+			}
+		}
+		
+		return -1;
 	}
 	
 	private Item criaItem()
 	{
 		Item item = new Item();
 		item.setNome(textField.getText());
-		String preco = textField_Preco.getText();
-		if(preco.equals(""))
-			return null;
-		item.setPrecoMenor(Integer.parseInt(preco));
 		return item;
 	}
 	
-	private String createUrl()
+	private String createUrl(String nome)
 	{
 		String url= "https://www.ragcomercio.com/search/2/";
-		String nomeItem = textField.getText().replaceAll("\\ ", "+").toLowerCase();
+		String nomeItem = nome.replaceAll("\\ ", "+").toLowerCase();
 		nomeItem = unAccent(nomeItem);
 		url = url + nomeItem;
 		return url;
+	}
+	
+	private boolean hasNewItem()
+	{
+		if(lastSize < listaMonitorados.size())
+		{
+			lastSize = listaMonitorados.size();
+			return true;	
+		}
+		else
+		{
+			lastSize = listaMonitorados.size();
+			return false;
+		}
+	}
+	
+	private List<Item> accesUrl(Item itemAtual)
+	{
+		String url = createUrl(itemAtual.getNome());
+		List<Item> itemsObj = new ArrayList<Item>();
+		try {
+			Document document =  Jsoup.connect(url).get(); //conecta na url
+			Elements elements = document.select("div#results"); //acha a divisao de resultados
+			Element element = elements.select("table").first(); //acha a primeira tabela
+			Elements items = element.select("tbody").select("tr"); //seleciona os elementos
+			for(int i=0;i<items.size();i++)
+			{
+				String nome = items.select("a.itemdropdown").get(i).text(); //acha o nome dos elemetos
+				int precoMenor = Integer.parseInt(items.select("span.label.label-success").get(i).text().replaceAll("\\.", "")); //acha o preco menor sem os pontos
+				Item novoItem = new Item();
+				novoItem.setNome(nome);
+				novoItem.setPrecoMenor(precoMenor);
+				itemsObj.add(novoItem);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+			return null;
+		}
+		return itemsObj;
 	}
 	
 	//Trecho de Codigo que nao e meu em partes 
@@ -204,74 +277,67 @@ public class JanelaJava extends JFrame {
 	     }
 	}
 	
-	private void displayTray() {
-        //Obtain only one instance of the SystemTray object
-        //SystemTray tray = SystemTray.getSystemTray();
+	private void displayNotification(Item item) {
 
-        //If the icon is a file
-        //Image image = Toolkit.getDefaultToolkit().createImage("icon.png");
-        //Alternative (if the icon is on the classpath):
-        //Image image = Toolkit.getDefaultToolkit().createImage(getClass().getResource("icon.png"));
-
-        //TrayIcon trayIcon = new TrayIcon(image, "Item Encontrado");
-        //Let the system resize the image if needed
-        //trayIcon.setImageAutoSize(true);
-        //Set tooltip text for the tray icon
-        //trayIcon.setToolTip("Item");
-        //tray.add(trayIcon);
-
-        trayIcon.displayMessage("Um item foi encontrado", "Acesse o o site RagComercio", MessageType.INFO);
+        trayIcon.displayMessage("O item: "+ item.getNome() + " foi encontrado.", "Acesse o o site RagComercio", MessageType.INFO);
     }
 	//-------------------------------------
 	//Fim
+	private class buscaTask implements Runnable
+	{
+
+		public void run() {
+			
+			Item item = criaItem();
+			List<Item> items = accesUrl(item);
+			if(!((DefaultListModel<String>)listBusca.getModel()).isEmpty())
+				((DefaultListModel<String>)listBusca.getModel()).removeAllElements();
+			
+			for(int i=0; i<items.size();i++)
+			{
+				((DefaultListModel<String>) listBusca.getModel()).addElement(items.get(i).getNome());
+			}
+		}
+	}
 	
-	private class webCrawlerTask implements Runnable
+	private class monitorTask implements Runnable
 	{
 		public void run() {
-			while(monitorar == true)
+			System.out.println("Iniciei Minhas Monitorações");
+			while(listaMonitorados.size() > 0)
 			{
-				String url = createUrl();
-				try {
-					textPane.setText("Buscando...");
-					Document document =  Jsoup.connect(url).get(); //conecta na url
-					Elements elements = document.select("div#results"); //acha a divisao de resultados
-					Element element = elements.select("table").first(); //acha a primeira tabela
-					Elements items = element.select("tbody").select("tr"); //seleciona os elementos
-					List<Item> itemsObj = new ArrayList<Item>();
+				int count = 0;
+				while(!hasNewItem())
+				{
+					if(count == 150 || listaMonitorados.size() == 0)
+						break;
+					try {
+						Thread.sleep(2000);
+					} catch (InterruptedException e) {
+					e.printStackTrace();
+					}
+					count++;
+				}
+				System.out.println("Recomeçar!");
+				for(int j=0; j<listaMonitorados.size();j++)
+				{
+					Item itemAtual = listaMonitorados.get(j);
+					List<Item> items = accesUrl(itemAtual);
+					
 					for(int i=0;i<items.size();i++)
 					{
-						String nome = items.select("a.itemdropdown").get(i).text(); //acha o nome dos elemetos
-						int precoMenor = Integer.parseInt(items.select("span.label.label-success").get(i).text().replaceAll("\\.", "")); //acha o preco menor sem os pontos
-						Item novoItem = new Item();
-						novoItem.setNome(nome);
-						novoItem.setPrecoMenor(precoMenor);
-						itemsObj.add(novoItem);
-						if(itemMonitorado.getNome().equals(novoItem.getNome()))
-						{
-							if(itemMonitorado.getPrecoMenor() >= novoItem.getPrecoMenor())
-							{
-								displayTray();
-							}
-						}
+						if(items.get(i).getPrecoMenor() < itemAtual.getPrecoMenor())
+							displayNotification(itemAtual);
 					}
-					String texto = "";
-					for(int i=0; i<itemsObj.size();i++)
-					{
-						texto = texto +"Nome: " + itemsObj.get(i).getNome() + " | Preço: " + itemsObj.get(i).getPrecoMenor() + "\n";
-					}
-					textPane.setText(texto);
 					
-				} catch (IOException e) {
+					try {
+						Thread.sleep(5000);
+					} catch (InterruptedException e) {
 					e.printStackTrace();
-				}
-				
-				try {
-					Thread.sleep(300000);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-					monitorar = false;
+					}
 				}
 			}
+			System.out.println("Finalizei Minhas Monitorações");
 		}
 	}
 }
