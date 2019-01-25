@@ -33,6 +33,9 @@ import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JList;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 
 public class JanelaJava extends JFrame {
 
@@ -46,6 +49,7 @@ public class JanelaJava extends JFrame {
 	private JButton btnRemover;
 	private List<Item> listaMonitorados = new ArrayList<Item>();
 	int lastSize = 0;
+	private Thread monitoraThread;
 
 	public static void main(String[] args) {
 		EventQueue.invokeLater(new Runnable() {
@@ -64,8 +68,72 @@ public class JanelaJava extends JFrame {
 	 * Create the frame.
 	 */
 	public JanelaJava() {
-		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		setBounds(100, 100, 818, 328);
+		setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+		setBounds(100, 100, 818, 377);
+		
+		JMenuBar menuBar = new JMenuBar();
+		setJMenuBar(menuBar);
+		JMenu arquivo = new JMenu("Arquivo");
+		arquivo.setMnemonic(KeyEvent.VK_A);
+
+		menuBar.add(arquivo);
+		JMenuItem salvar,abrir, exit;
+		salvar = new JMenuItem("Salvar");
+		salvar.getAccessibleContext().setAccessibleDescription(
+		        "Salva a lista de Items atual.");
+		salvar.addActionListener(new ActionListener() {
+			
+			public void actionPerformed(ActionEvent e) {
+				
+				try {
+					DataManipulator.writeDataFile(listaMonitorados); //atualiza a lista de itens no arquivo
+				} catch (IOException e1) {
+					e1.printStackTrace();
+				}
+				
+			}
+		});
+		
+		abrir = new JMenuItem("Abrir");
+		abrir.getAccessibleContext().setAccessibleDescription(
+		        "Carrega a lista de Items salva.");
+		abrir.addActionListener(new ActionListener() {
+			
+			public void actionPerformed(ActionEvent e) {
+				
+				
+				listaMonitorados.clear();
+				try {
+					listaMonitorados = DataManipulator.readDataFile(); //atualiza a lista de itens no arquivo
+				} catch (IOException e1) {
+					e1.printStackTrace();
+				}
+				refreshJListMonitorar();
+				if(monitoraThread == null)
+				{
+					monitoraThread = new Thread(new monitorTask()); 
+					monitoraThread.start();
+				}else if(!monitoraThread.isAlive())
+				{
+					monitoraThread = new Thread(new monitorTask()); 
+					monitoraThread.start();
+				}
+			}
+		});
+		
+		exit = new JMenuItem("Sair");
+		exit.addActionListener(new ActionListener() {
+			
+			public void actionPerformed(ActionEvent e) {
+			
+				System.exit(0);
+			}
+		});
+		
+		arquivo.add(abrir);
+		arquivo.add(salvar);
+		arquivo.add(exit);
+		
 		contentPane = new JPanel();
 		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
 		setContentPane(contentPane);
@@ -135,10 +203,15 @@ public class JanelaJava extends JFrame {
 				String preco = JOptionPane.showInputDialog(null, "Insira o limite inferior:");
 				itemMonitorado.setPrecoMenor(Integer.parseInt(preco));
 				listaMonitorados.add(itemMonitorado);
+			
 				((DefaultListModel<String>) list.getModel()).addElement(itemMonitorado.getNome());
-				if(listaMonitorados.size() == 1) //se a lista estiver vazia inicialmente dispara a tarefa
+				if(monitoraThread == null) //se a lista estiver vazia inicialmente dispara a tarefa
 				{
-					Thread monitoraThread = new Thread(new monitorTask()); 
+					monitoraThread = new Thread(new monitorTask()); 
+					monitoraThread.start();
+				}else if(!monitoraThread.isAlive())
+				{
+					monitoraThread = new Thread(new monitorTask()); 
 					monitoraThread.start();
 				}
 			}
@@ -165,6 +238,16 @@ public class JanelaJava extends JFrame {
 		return -1;
 	}
 	
+	private void refreshJListMonitorar()
+	{
+		((DefaultListModel<String>) list.getModel()).clear();
+		
+		for(int i=0;i<listaMonitorados.size();i++)
+		{
+			((DefaultListModel<String>) list.getModel()).addElement(listaMonitorados.get(i).getNome());
+		}
+	}
+	
 	private Item criaItem() //cria o objeto do item
 	{
 		Item item = new Item();
@@ -176,6 +259,8 @@ public class JanelaJava extends JFrame {
 	{
 		String url= "https://www.ragcomercio.com/search/2/";
 		String nomeItem = nome.replaceAll("\\ ", "+").toLowerCase(); //remove os espacos
+		nomeItem = nomeItem.replaceAll("\\[", "");
+		nomeItem = nomeItem.replaceAll("\\]", "");
 		nomeItem = unAccent(nomeItem); //remove os acentos
 		url = url + nomeItem;
 		return url;
@@ -278,7 +363,7 @@ public class JanelaJava extends JFrame {
 	}
 	
 	private void displayNotification(Item item) {
-
+		
         trayIcon.displayMessage("O item: "+ item.getNome() + " foi encontrado.", "Acesse o o site RagComercio", MessageType.INFO);
     }
 	//-------------------------------------
