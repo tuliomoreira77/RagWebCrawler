@@ -36,6 +36,7 @@ import javax.swing.JList;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JCheckBox;
 
 public class JanelaJava extends JFrame {
 
@@ -50,7 +51,10 @@ public class JanelaJava extends JFrame {
 	private List<Item> listaMonitorados = new ArrayList<Item>();
 	int lastSize = 0;
 	private Thread monitoraThread;
-
+	private boolean carta = false;
+	private boolean refinamento = false;
+	private int nRefinamento = 0;
+	
 	public static void main(String[] args) {
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
@@ -199,7 +203,7 @@ public class JanelaJava extends JFrame {
 
 			public void actionPerformed(ActionEvent e) {
 				Item itemMonitorado = new Item();
-				itemMonitorado.setNome(listBusca.getSelectedValue());
+				itemMonitorado.setNome(formataNome(listBusca.getSelectedValue()));
 				String preco = JOptionPane.showInputDialog(null, "Insira o limite inferior:");
 				itemMonitorado.setPrecoMenor(Integer.parseInt(preco));
 				listaMonitorados.add(itemMonitorado);
@@ -221,6 +225,23 @@ public class JanelaJava extends JFrame {
 		listBusca = new JList<String>(modelBusca);
 		listBusca.setBounds(37, 103, 332, 138);
 		contentPane.add(listBusca);
+		
+		JButton btnOpes = new JButton("Opções");
+		btnOpes.setBounds(280, 252, 89, 23);
+		contentPane.add(btnOpes);
+		
+		btnOpes.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				JanelaOpcoes op = new JanelaOpcoes(carta,refinamento,nRefinamento);
+				op.setModal(true);
+				op.setVisible(true);
+				carta = op.getCarta();
+				refinamento = op.getRefinamento();
+				nRefinamento = op.getNRefinamento();
+			}
+		});
 		
 		createSystemTray();
 	}
@@ -253,6 +274,21 @@ public class JanelaJava extends JFrame {
 		Item item = new Item();
 		item.setNome(textField.getText());
 		return item;
+	}
+	
+	private String formataNome(String nome)
+	{
+		String formNome = nome;
+		if(carta)
+		{
+			formNome = formNome.substring(0,nome.indexOf("["));
+		}	
+		if(refinamento)
+		{
+			if(nome.charAt(0) == '+')
+				formNome = formNome.substring(3);
+		}	
+		return formNome;
 	}
 	
 	private String createUrl(String nome) //cria a url modelo
@@ -292,11 +328,15 @@ public class JanelaJava extends JFrame {
 			for(int i=0;i<items.size();i++)
 			{
 				String nome = items.select("a.itemdropdown").get(i).text(); //acha o nome dos elemetos
-				int precoMenor = Integer.parseInt(items.select("span.label.label-success").get(i).text().replaceAll("\\.", "")); //acha o preco menor sem os pontos
-				Item novoItem = new Item();
-				novoItem.setNome(nome);
-				novoItem.setPrecoMenor(precoMenor);
-				itemsObj.add(novoItem);
+				try {
+					int precoMenor = Integer.parseInt(items.select("span.label.label-success").get(i).text().replaceAll("\\.", "")); //acha o preco menor sem os pontos
+					Item novoItem = new Item();
+					novoItem.setNome(nome);
+					novoItem.setPrecoMenor(precoMenor);
+					itemsObj.add(novoItem);
+				} catch (Exception e) {
+					
+				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -372,7 +412,6 @@ public class JanelaJava extends JFrame {
 	{
 
 		public void run() {
-			
 			Item item = criaItem();
 			List<Item> items = accesUrl(item);
 			if(!((DefaultListModel<String>)listBusca.getModel()).isEmpty())
@@ -408,12 +447,32 @@ public class JanelaJava extends JFrame {
 				{
 					Item itemAtual = listaMonitorados.get(j);
 					List<Item> items = accesUrl(itemAtual);
-					
+					boolean notify = false;
 					for(int i=0;i<items.size();i++)
 					{
-						if(items.get(i).getPrecoMenor() < itemAtual.getPrecoMenor())
-							displayNotification(itemAtual);
+						if(refinamento)
+						{
+							int refinamento = 0;
+							try {
+								refinamento = Integer.parseInt(items.get(i).getNome().substring(1, 2));
+							}
+							catch (Exception e) {
+								
+							}
+							if(refinamento >= nRefinamento)
+							{
+								if(items.get(i).getPrecoMenor() <= itemAtual.getPrecoMenor())
+									notify = true;
+							}
+						}
+						else {
+							if(items.get(i).getPrecoMenor() <= itemAtual.getPrecoMenor())
+								notify = true;
+						}
 					}
+					
+					if(notify)
+						displayNotification(itemAtual);
 					
 					try {
 						Thread.sleep(5000);
